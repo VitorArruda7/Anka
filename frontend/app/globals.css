@@ -1,0 +1,28 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --background: #f8fafc;
+  --foreground: #0b1120;
+  --surface: #ffffff;
+  --surface-muted: #e2e8f0;
+  --border: #d0d7e2;
+  --muted: #64748b;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #0b1120;
+  --foreground: #f8fafc;
+  --surface: #111c2d;
+  --surface-muted: #1e293b;
+  --border: #1f2937;
+  --muted: #94a3b8;
+}
+
+body {
+  @apply bg-background text-foreground;
+  font-family: 'Inter', sans-serif;
+}
