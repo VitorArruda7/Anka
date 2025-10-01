@@ -1,22 +1,22 @@
 # Anka Fullstack Investment Dashboard
 
-Aplicacao full-stack para um escritorio de investimentos gerenciar clientes, ativos, alocacoes e fluxos de caixa. Backend em FastAPI + PostgreSQL + Redis, frontend em Next.js 14. Todo o ambiente sobe via Docker Compose.
+Aplicação full-stack para um escritório de investimentos gerenciar clientes, ativos, alocações e fluxos de caixa. Backend em FastAPI + PostgreSQL + Redis, frontend em Next.js 14. Todo o ambiente sobe via Docker Compose.
 
 ## Estrutura do projeto
 
-- `backend/` - API FastAPI com autenticacao JWT, ORM SQLAlchemy 2, Redis para cache, auditoria, exportacao CSV/Excel e testes automatizados `pytest`.
-- `frontend/` - Next.js 14 (App Router) com TypeScript, TanStack Query, componentes baseados em ShadCN, graficos e exportacao de dados.
+- `backend/` - API FastAPI com autenticação JWT, ORM SQLAlchemy 2, Redis para cache, auditoria, exportação CSV/Excel e testes automatizados `pytest`.
+- `frontend/` - Next.js 14 (App Router) com TypeScript, TanStack Query, componentes baseados em ShadCN, gráficos e exportação de dados.
 - `docker-compose.yml` - orquestra Postgres 15, Redis 7, backend e frontend.
 
 ## Executando com Docker
 
-Prerequisito: Docker Desktop (ou Docker Engine + plugin compose).
+Pré-requisito: Docker Desktop (ou Docker Engine + plugin compose).
 
 ```bash
 docker compose up --build
 ```
 
-Servicos apos o build:
+Serviços após o build:
 
 - Backend: http://localhost:8000/api
 - Docs Swagger: http://localhost:8000/docs
@@ -24,18 +24,18 @@ Servicos apos o build:
 
 ## Desenvolvimento local (sem Docker)
 
-Cada pasta possui README proprio com mais detalhes. Resumo:
+Cada pasta possui README próprio com mais detalhes. Resumo rápido:
 
-1. Criar virtualenv Python e instalar deps: `pip install -r backend/requirements-dev.txt`.
+1. Criar virtualenv Python e instalar dependências: `pip install -r backend/requirements-dev.txt`.
 2. Copiar `backend/.env.example` para `backend/.env` e ajustar segredos (`DATABASE_URL`, `SECRET_KEY`, etc.).
-3. Rodar migracoes: `alembic upgrade head` (Postgres precisa estar ativo).
+3. Rodar migraões: `alembic upgrade head` (Postgres precisa estar ativo).
 4. Iniciar API: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`.
 5. No frontend: `npm install` e `cp frontend/.env.example frontend/.env.local` definindo `NEXT_PUBLIC_API_URL`.
 6. Rodar `npm run dev`.
 
 ## Seed de dados
 
-Existe um seed opcional com usuario demo, clientes, ativos, alocacoes e movimentacoes.
+Há um seed opcional com usuário demo, clientes, ativos, alocações e movimentações.
 
 ```bash
 # Ambiente local
@@ -48,29 +48,29 @@ docker compose exec backend python -m app.seed.sample_data
 
 Credenciais geradas: `demo@anka.com` / `demo123`.
 
-Caso precise resetar completamente o banco em Docker:
+Para resetar completamente o banco em Docker:
 
 ```bash
 docker compose down
 docker volume rm ankafullstack_db_data
 docker compose up -d
-# aplicar migracoes antes do seed
+# aplicar migrações antes do seed
 docker compose exec backend alembic upgrade head
 ```
 
-## Funcionalidades chave
+## Funcionalidades-chave
 
-- Autenticacao JWT com login, registro e CRUD de usuarios (administradores).
-- Cadastro e listagem de clientes com paginacao, busca e filtro por status.
-- Importacao de ativos via Yahoo Finance (fallback BRAPI) + cadastro manual.
-- Gestao de alocacoes (cliente x ativo) com paginacao e exportacao.
-- Registro de movimentacoes (deposito/retirada) com filtros de periodo e indicadores.
-- Dashboard consolidado com cache Redis, exportacao Excel/CSV.
-- Auditoria completa: toda acao CRUD relevante grava evento em `audit_logs` com metadados e user.
+- Autenticação JWT com login, registro e CRUD de usuários (administradores).
+- Cadastro e listagem de clientes com paginação, busca e filtro por status.
+- Importação de ativos via Yahoo Finance (fallback BRAPI) + cadastro manual.
+- Gestão de alocações (cliente x ativo) com paginação e exportação.
+- Registro de movimentações (depósito/retirada) com filtros de período e indicadores.
+- Dashboard consolidado com cache Redis, exportação Excel/CSV.
+- Auditoria completa: toda ação CRUD relevante grava evento em `audit_logs` com metadados e usuário.
 
-## Integracoes externas
+## Integrações externas
 
-- Yahoo Finance para quotes (crumb + cookie automaticos).
+- Yahoo Finance para cotações (crumb + cookie automáticos).
 - BRAPI como fallback opcional. Configure `BRAPI_TOKEN` em `backend/.env` para ampliar limites.
 
 ## Testes
@@ -78,23 +78,23 @@ docker compose exec backend alembic upgrade head
 - Backend: `pytest`
 - Frontend: `npm run lint`
 
-Os testes backend rodam 100% assincronos usando banco SQLite em memoria. Antes de entregar, execute:
+Os testes backend rodam 100% assíncronos usando banco SQLite em memória. Antes de entregar, execute:
 
 ```bash
 # backend
-dotenv -f backend/.env pytest  # ou simplesmente python -m pytest dentro da venv
+cd backend && python -m pytest
 
 # frontend
-npm run lint
+cd frontend && npm run lint
 ```
 
 ## Auditoria e cache
 
-- `audit_logs` registra acao, entidade, IDs, usuario e payload complementar.
-- Redis guarda snapshots do dashboard e quotes de mercado, com invalidacao automatica apos mutacoes.
+- `audit_logs` registra ação, entidade, IDs, usuário e payload complementar.
+- Redis guarda snapshots do dashboard e quotes de mercado, com invalidação automática após mutações.
 
 ## Deploy
 
-- Ajustar variaveis em `backend/.env` para ambiente (secret, DB, Redis, tokens).
-- Rodar migracoes `alembic upgrade head` apos subir containers.
+- Ajustar variáveis em `backend/.env` para ambiente (secret, DB, Redis, tokens).
+- Rodar migrações `alembic upgrade head` após subir containers.
 - Opcional: executar seed para dados demo.
