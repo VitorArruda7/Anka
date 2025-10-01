@@ -21,6 +21,8 @@ class Settings(BaseSettings):
         alias="DATABASE_URL",
     )
     redis_url: str = Field(default="redis://redis:6379/0", alias="REDIS_URL")
+    dashboard_cache_ttl: int = Field(default=300, alias="DASHBOARD_CACHE_TTL")
+    market_cache_ttl: int = Field(default=600, alias="MARKET_CACHE_TTL")
     brapi_token: str | None = Field(default=None, alias="BRAPI_TOKEN")
 
 

@@ -5,6 +5,7 @@ from app.api.routes import (
     assets,
     auth,
     clients,
+    dashboard,
     export,
     movements,
     users,
@@ -18,3 +19,4 @@ api_router.include_router(assets.router, prefix="/assets", tags=["assets"])
 api_router.include_router(allocations.router, prefix="/allocations", tags=["allocations"])
 api_router.include_router(movements.router, prefix="/movements", tags=["movements"])
 api_router.include_router(export.router, prefix="/export", tags=["export"])
+api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])

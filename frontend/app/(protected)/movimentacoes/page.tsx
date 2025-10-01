@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,13 +8,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 
 import { api } from "@/lib/axios";
-import { Client, Movement } from "@/lib/types";
+import { Client, Movement, PaginatedResponse, PaginationMeta } from "@/lib/types";
 import { formatCurrencyBRL, formatDate } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginationControls } from "@/components/ui/pagination";
 
 const movementSchema = z.object({
   client_id: z.coerce.number({ invalid_type_error: "Selecione um cliente" }),
@@ -30,13 +31,24 @@ const movementSchema = z.object({
 
 type MovementFormValues = z.infer<typeof movementSchema>;
 
+const EMPTY_MOVEMENTS: Movement[] = [];
+
 async function fetchClients() {
-  const response = await api.get<Client[]>("/clients", { params: { limit: 200 } });
-  return response.data;
+  const response = await api.get<PaginatedResponse<Client>>("/clients", { params: { page: 1, page_size: 200 } });
+  return response.data.items;
 }
 
-async function fetchMovements(clientId: number | "todos", startDate: string, endDate: string) {
-  const params: Record<string, string | number> = {};
+async function fetchMovements(
+  clientId: number | "todos",
+  startDate: string,
+  endDate: string,
+  page: number,
+  pageSize: number
+) {
+  const params: Record<string, string | number> = {
+    page,
+    page_size: pageSize,
+  };
   if (clientId !== "todos") {
     params.client_id = clientId;
   }
@@ -46,7 +58,7 @@ async function fetchMovements(clientId: number | "todos", startDate: string, end
   if (endDate) {
     params.end_date = endDate;
   }
-  const response = await api.get<Movement[]>("/movements", { params });
+  const response = await api.get<PaginatedResponse<Movement>>("/movements", { params });
   return response.data;
 }
 
@@ -64,13 +76,33 @@ export default function MovimentacoesPage() {
   const [clientFilter, setClientFilter] = useState<number | "todos">("todos");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const pageSize = 20;
+  const [page, setPage] = useState(1);
 
   const clientsQuery = useQuery({ queryKey: ["clientes", "select"], queryFn: fetchClients });
 
-  const { data: movements = [], isLoading } = useQuery({
-    queryKey: ["movimentacoes", clientFilter, startDate, endDate],
-    queryFn: () => fetchMovements(clientFilter, startDate, endDate),
+  useEffect(() => {
+    setPage(1);
+  }, [clientFilter, startDate, endDate]);
+
+  const movementsQuery = useQuery({
+    queryKey: ["movimentacoes", clientFilter, startDate, endDate, page, pageSize],
+    queryFn: () => fetchMovements(clientFilter, startDate, endDate, page, pageSize),
   });
+
+  const movements = movementsQuery.data?.items ?? EMPTY_MOVEMENTS;
+  const meta: PaginationMeta = movementsQuery.data?.meta ?? { total: 0, page, page_size: pageSize, pages: 0 };
+  const isLoading = movementsQuery.isLoading;
+  const isFetching = movementsQuery.isFetching;
+
+  const handlePageChange = (nextPage: number) => {
+    if (meta.pages === 0) {
+      setPage(1);
+      return;
+    }
+    const normalized = Math.min(Math.max(nextPage, 1), meta.pages);
+    setPage(normalized);
+  };
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
@@ -153,11 +185,11 @@ export default function MovimentacoesPage() {
                 className="mt-2 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground"
                 {...form.register("client_id")}
               >
-                <option value={0} className="text-black">
+                <option value={0}>
                   Selecione
                 </option>
                 {clients.map((client) => (
-                  <option key={client.id} value={client.id} className="text-black">
+                  <option key={client.id} value={client.id}>
                     {client.name}
                   </option>
                 ))}
@@ -173,10 +205,10 @@ export default function MovimentacoesPage() {
                 className="mt-2 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground"
                 {...form.register("type")}
               >
-                <option value="deposit" className="text-black">
+                <option value="deposit">
                   Entrada
                 </option>
-                <option value="withdrawal" className="text-black">
+                <option value="withdrawal">
                   Saída
                 </option>
               </select>
@@ -227,11 +259,11 @@ export default function MovimentacoesPage() {
                 setClientFilter(value === "todos" ? "todos" : Number(value));
               }}
             >
-              <option value="todos" className="text-black">
+              <option value="todos">
                 Todos os clientes
               </option>
               {clients.map((client) => (
-                <option key={client.id} value={client.id} className="text-black">
+                <option key={client.id} value={client.id}>
                   {client.name}
                 </option>
               ))}
@@ -336,6 +368,9 @@ export default function MovimentacoesPage() {
               )}
             </TableBody>
           </Table>
+          <div className="pt-2">
+            <PaginationControls meta={meta} onPageChange={handlePageChange} isLoading={isFetching} />
+          </div>
         </CardContent>
       </Card>
     </div>

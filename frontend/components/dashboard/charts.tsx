@@ -10,10 +10,12 @@ import {
   Legend,
   Pie,
   PieChart,
+  Cell,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import type { PieLabelRenderProps } from "recharts";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 
 type CustodyPoint = {
@@ -47,6 +49,52 @@ const fallbackFlow: FlowPoint[] = [
 const fallbackAllocation: AllocationSlice[] = [
   { name: "Sem dados", value: 1 },
 ];
+const allocationColors = [
+  "#06b6d4",
+  "#22c55e",
+  "#f97316",
+  "#a855f7",
+  "#ef4444",
+  "#14b8a6",
+  "#eab308",
+  "#3b82f6",
+  "#facc15",
+  "#fb7185",
+];
+
+const RADIAN = Math.PI / 180;
+
+function renderAllocationLabel({
+  cx = 0,
+  cy = 0,
+  midAngle = 0,
+  innerRadius = 0,
+  outerRadius = 0,
+  percent = 0,
+}: PieLabelRenderProps) {
+  const centerX = typeof cx === "number" ? cx : Number(cx) || 0;
+  const centerY = typeof cy === "number" ? cy : Number(cy) || 0;
+  const inner = typeof innerRadius === "number" ? innerRadius : Number(innerRadius) || 0;
+  const outer = typeof outerRadius === "number" ? outerRadius : Number(outerRadius) || inner;
+  const valuePercent = typeof percent === "number" ? percent : Number(percent) || 0;
+  const radius = inner + (outer - inner) * 0.5;
+  const angle = -midAngle * RADIAN;
+  const x = centerX + radius * Math.cos(angle);
+  const y = centerY + radius * Math.sin(angle);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor={x > centerX ? "start" : "end"}
+      dominantBaseline="central"
+      className="fill-foreground text-xs font-medium"
+    >
+      {`${Math.round(valuePercent * 100)}%`}
+    </text>
+  );
+}
+
 
 export function CustodyChart({ data }: { data: CustodyPoint[] }) {
   const chartData = data.length ? data : fallbackCustody;
@@ -55,7 +103,7 @@ export function CustodyChart({ data }: { data: CustodyPoint[] }) {
       <CardHeader>
         <CardTitle>Evolução de custódia</CardTitle>
       </CardHeader>
-      <div className="h-60">
+      <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData}>
             <defs>
@@ -107,21 +155,27 @@ export function AllocationChart({ data }: { data: AllocationSlice[] }) {
       <CardHeader>
         <CardTitle>Mix de alocação</CardTitle>
       </CardHeader>
-      <div className="h-60">
+      <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
+          <PieChart margin={{ top: 16, right: 16, bottom: 32, left: 16 }}>
             <Tooltip contentStyle={{ background: "#020617", border: "1px solid #1e293b" }} />
-            <Legend />
+            <Legend layout="horizontal" verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: "0.75rem" }} />
             <Pie
               data={chartData}
               dataKey="value"
               nameKey="name"
               cx="50%"
               cy="50%"
-              outerRadius={80}
-              fill="#22c55e"
-              label
-            />
+              innerRadius={40}
+              outerRadius={85}
+              paddingAngle={2}
+              labelLine={false}
+              label={renderAllocationLabel}
+            >
+              {chartData.map((slice, index) => (
+                <Cell key={slice.name} fill={allocationColors[index % allocationColors.length]} />
+              ))}
+            </Pie>
           </PieChart>
         </ResponsiveContainer>
       </div>

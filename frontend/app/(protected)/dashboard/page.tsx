@@ -10,28 +10,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/axios";
-import { Allocation, Asset, Client, Movement } from "@/lib/types";
+import { Allocation, Asset, Client, Movement, PaginatedResponse } from "@/lib/types";
 import { formatCurrencyBRL } from "@/lib/utils";
 import { toast } from "react-hot-toast";
 
 async function fetchClients() {
-  const response = await api.get<Client[]>("/clients", { params: { limit: 200 } });
-  return response.data;
+  const response = await api.get<PaginatedResponse<Client>>("/clients", { params: { page: 1, page_size: 200 } });
+  return response.data.items;
 }
 
 async function fetchAssets() {
-  const response = await api.get<Asset[]>("/assets", { params: { limit: 200 } });
-  return response.data;
+  const response = await api.get<PaginatedResponse<Asset>>("/assets", { params: { page: 1, page_size: 200 } });
+  return response.data.items;
 }
 
 async function fetchAllocations() {
-  const response = await api.get<Allocation[]>("/allocations");
-  return response.data;
+  const response = await api.get<PaginatedResponse<Allocation>>("/allocations", { params: { page: 1, page_size: 200 } });
+  return response.data.items;
 }
 
 async function fetchMovements() {
-  const response = await api.get<Movement[]>("/movements");
-  return response.data;
+  const response = await api.get<PaginatedResponse<Movement>>("/movements", { params: { page: 1, page_size: 200 } });
+  return response.data.items;
 }
 
 function monthKey(dateString: string) {
@@ -254,9 +254,10 @@ function DashboardContent() {
   ];
 
   const handleExportClients = async () => {
+    let url: string | null = null;
     try {
       const response = await api.get("/export/clients", { responseType: "blob" });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", "clientes.csv");
@@ -266,6 +267,31 @@ function DashboardContent() {
       toast.success("Exportação de clientes gerada");
     } catch (error) {
       toast.error("Falha ao exportar clientes");
+    } finally {
+      if (url) {
+        window.URL.revokeObjectURL(url);
+      }
+    }
+  };
+
+  const handleExportDashboardExcel = async () => {
+    let url: string | null = null;
+    try {
+      const response = await api.get("/export/dashboard/excel", { responseType: "blob" });
+      url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "dashboard.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("Exportação do dashboard gerada");
+    } catch (error) {
+      toast.error("Falha ao exportar dashboard");
+    } finally {
+      if (url) {
+        window.URL.revokeObjectURL(url);
+      }
     }
   };
 
@@ -311,6 +337,9 @@ function DashboardContent() {
               <option value="ativos">Ativos</option>
               <option value="inativos">Inativos</option>
             </select>
+            <Button variant="outline" onClick={handleExportDashboardExcel}>
+              Exportar Excel
+            </Button>
             <Button variant="outline" onClick={handleExportClients}>
               Exportar CSV
             </Button>

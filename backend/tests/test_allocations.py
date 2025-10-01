@@ -30,5 +30,6 @@ async def test_create_allocation(client):
 
     list_response = await client.get("/api/allocations/", params={"client_id": client_id})
     assert list_response.status_code == 200
-    allocations = list_response.json()
-    assert len(allocations) == 1
+    data = list_response.json()
+    assert data["meta"]["total"] == 1
+    assert len(data["items"]) == 1

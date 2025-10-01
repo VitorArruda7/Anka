@@ -20,5 +20,6 @@ async def test_create_movement(client):
 
     list_response = await client.get("/api/movements/", params={"client_id": client_id})
     assert list_response.status_code == 200
-    movements = list_response.json()
-    assert len(movements) == 1
+    data = list_response.json()
+    assert data["meta"]["total"] == 1
+    assert len(data["items"]) == 1

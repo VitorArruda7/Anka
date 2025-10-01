@@ -4,8 +4,8 @@ Plataforma full-stack para gerenciar clientes, alocações de ativos e fluxos de
 
 ## Estrutura
 
-- `backend/` – serviço FastAPI com autenticação JWT, modelos SQLAlchemy, migrações Alembic, testes assíncronos e exportação CSV.
-- `frontend/` – projeto Next.js 14 (App Router) com TanStack Query, UI inspirada no ShadCN, gráficos e downloads CSV.
+- `backend/` - servico FastAPI com autenticacao JWT, modelos SQLAlchemy, migracoes Alembic, testes assincronos e exportacao CSV e Excel (dashboard).
+- `frontend/` - projeto Next.js 14 (App Router) com TanStack Query, UI inspirada no ShadCN, graficos e downloads CSV/Excel.
 - `docker-compose.yml` – orquestra PostgreSQL, Redis, API e interface.
 
 ## Execução com Docker
@@ -58,7 +58,7 @@ Credenciais geradas: `demo@anka.com` / `demo123`.
 2. **Cadastrar clientes:** na tela *Clientes*, informe nome, e-mail e status.
 3. **Alocações:** vincule clientes e ativos na tela *Alocações* (quantidade, preço, data).
 4. **Movimentações:** registre entradas/saídas em *Movimentações* para alimentar indicadores de fluxo.
-5. **Exportações:** gere CSVs (clientes, alocações, movimentações) na tela *Exportações* ou via `/api/export/*`.
+5. **Exportacoes:** gere CSVs (clientes, alocacoes, movimentacoes) e Excel completo do dashboard na tela *Exportacoes* ou via `/api/export/*` e `/api/export/dashboard/excel`.
 
 ## Integração de dados de mercado
 

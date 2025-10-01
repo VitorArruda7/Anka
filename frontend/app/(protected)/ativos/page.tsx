@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,12 +8,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 
 import { api } from "@/lib/axios";
-import { Asset } from "@/lib/types";
+import { Asset, PaginatedResponse, PaginationMeta } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginationControls } from "@/components/ui/pagination";
 
 const manualAssetSchema = z.object({
   ticker: z.string().min(1, { message: "Informe o ticker" }),
@@ -24,8 +25,15 @@ const manualAssetSchema = z.object({
 
 type ManualAssetFormValues = z.infer<typeof manualAssetSchema>;
 
-async function fetchAssets() {
-  const response = await api.get<Asset[]>("/assets", { params: { limit: 200 } });
+async function fetchAssets(page: number, pageSize: number, search: string) {
+  const params: Record<string, string | number> = {
+    page,
+    page_size: pageSize,
+  };
+  if (search) {
+    params.search = search;
+  }
+  const response = await api.get<PaginatedResponse<Asset>>("/assets", { params });
   return response.data;
 }
 
@@ -42,11 +50,32 @@ async function createAsset(payload: ManualAssetFormValues) {
 export default function AtivosPage() {
   const queryClient = useQueryClient();
   const [tickerSearch, setTickerSearch] = useState("");
+  const [listSearch, setListSearch] = useState("");
+  const pageSize = 20;
+  const [page, setPage] = useState(1);
 
-  const { data: assets = [], isLoading } = useQuery({
-    queryKey: ["ativos"],
-    queryFn: fetchAssets,
+  useEffect(() => {
+    setPage(1);
+  }, [listSearch]);
+
+  const assetsQuery = useQuery({
+    queryKey: ["ativos", listSearch, page, pageSize],
+    queryFn: () => fetchAssets(page, pageSize, listSearch),
   });
+
+  const assets = assetsQuery.data?.items ?? [];
+  const meta: PaginationMeta = assetsQuery.data?.meta ?? { total: 0, page, page_size: pageSize, pages: 0 };
+  const isLoading = assetsQuery.isLoading;
+  const isFetching = assetsQuery.isFetching;
+
+  const handlePageChange = (nextPage: number) => {
+    if (meta.pages === 0) {
+      setPage(1);
+      return;
+    }
+    const normalized = Math.min(Math.max(nextPage, 1), meta.pages);
+    setPage(normalized);
+  };
 
   const manualForm = useForm<ManualAssetFormValues>({
     resolver: zodResolver(manualAssetSchema),
@@ -186,6 +215,16 @@ export default function AtivosPage() {
           <CardDescription>{assets.length} ativo(s) disponíveis para alocação</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 max-w-sm">
+            <Label htmlFor="busca-ativos">Buscar</Label>
+            <Input
+              id="busca-ativos"
+              placeholder="Pesquisar por ticker ou nome"
+              value={listSearch}
+              onChange={(event) => setListSearch(event.target.value)}
+              className="mt-2"
+            />
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -220,6 +259,9 @@ export default function AtivosPage() {
               )}
             </TableBody>
           </Table>
+          <div className="pt-2">
+            <PaginationControls meta={meta} onPageChange={handlePageChange} isLoading={isFetching} />
+          </div>
         </CardContent>
       </Card>
     </div>

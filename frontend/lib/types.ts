@@ -39,3 +39,15 @@ export interface Movement {
   date: string;
   note?: string | null;
 }
+
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  meta: PaginationMeta;
+}

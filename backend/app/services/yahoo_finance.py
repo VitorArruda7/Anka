@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 
 import httpx
 
+from app.core.cache import redis_get_json, redis_set_json
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -103,33 +104,51 @@ class BrapiClient:
 
 
 class MarketDataService:
+    cache_prefix = "market:quote:"
+
     def __init__(self) -> None:
         self.yahoo = YahooFinanceClient()
         self.brapi = BrapiClient()
 
     async def fetch_quote(self, ticker: str) -> dict[str, Any]:
+        symbol = ticker.upper().strip()
+        cache_key = f"{self.cache_prefix}{symbol}"
+        cached = await redis_get_json(cache_key)
+        if isinstance(cached, dict):
+            logger.info("Quote retrieved from cache for %s", symbol)
+            return cached
+
         try:
-            quote = await self.yahoo.fetch_quote(ticker)
-            logger.info("Quote fetched via Yahoo Finance for %s", ticker)
-            return quote
+            quote = await self.yahoo.fetch_quote(symbol)
+            logger.info("Quote fetched via Yahoo Finance for %s", symbol)
         except Exception as yahoo_error:  # noqa: BLE001
             logger.warning(
                 "Yahoo Finance fetch failed for %s: %s. Falling back to BRAPI.",
-                ticker,
+                symbol,
                 yahoo_error,
             )
             try:
-                quote = await self.brapi.fetch_quote(ticker)
-                logger.info("Quote fetched via BRAPI for %s", ticker)
-                return quote
+                quote = await self.brapi.fetch_quote(symbol)
+                logger.info("Quote fetched via BRAPI for %s", symbol)
             except Exception as brapi_error:  # noqa: BLE001
                 logger.error(
                     "BRAPI fetch also failed for %s: %s (Yahoo error: %s)",
-                    ticker,
+                    symbol,
                     brapi_error,
                     yahoo_error,
                 )
                 raise brapi_error
+
+        await self._cache_quote(cache_key, quote)
+        return quote
+
+    async def _cache_quote(self, cache_key: str, quote: dict[str, Any]) -> None:
+        settings = get_settings()
+        ttl = settings.market_cache_ttl
+        if ttl <= 0:
+            return
+        await redis_set_json(cache_key, quote, ttl=ttl)
+
 
 
 market_data_service = MarketDataService()

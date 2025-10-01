@@ -40,7 +40,7 @@ async def ensure_user(session) -> None:
 async def ensure_assets(session) -> dict[str, Asset]:
     predefined = [
         {"ticker": "PETR4", "name": "Petrobras PN", "exchange": "B3", "currency": "BRL"},
-        {"ticker": "ITUB4", "name": "Ita? Unibanco PN", "exchange": "B3", "currency": "BRL"},
+        {"ticker": "ITUB4", "name": "Itaú Unibanco PN", "exchange": "B3", "currency": "BRL"},
         {"ticker": "BOVA11", "name": "iShares Ibovespa", "exchange": "B3", "currency": "BRL"},
         {"ticker": "AAPL", "name": "Apple Inc.", "exchange": "NASDAQ", "currency": "USD"},
         {"ticker": "GLD", "name": "SPDR Gold Shares", "exchange": "NYSEARCA", "currency": "USD"},
@@ -61,7 +61,7 @@ async def ensure_clients(session) -> dict[str, Client]:
     predefined = [
         {"name": "Aurora Capital", "email": "aurora@clients.com", "is_active": True},
         {"name": "Boreal Family Office", "email": "boreal@clients.com", "is_active": True},
-        {"name": "Constela??o Invest", "email": "constelacao@clients.com", "is_active": False},
+        {"name": "Constelação Invest", "email": "constelacao@clients.com", "is_active": False},
     ]
     clients: dict[str, Client] = {}
     for item in predefined:
@@ -109,9 +109,9 @@ async def ensure_allocations(session, clients, assets) -> None:
 async def ensure_movements(session, clients) -> None:
     movements = [
         ("aurora@clients.com", MovementType.deposit, Decimal("250000"), date(2024, 5, 18), "Aporte trimestral"),
-        ("aurora@clients.com", MovementType.withdrawal, Decimal("85000"), date(2024, 7, 2), "Liquida??o de lucro"),
+        ("aurora@clients.com", MovementType.withdrawal, Decimal("85000"), date(2024, 7, 2), "Liquidação de lucro"),
         ("boreal@clients.com", MovementType.deposit, Decimal("180000"), date(2024, 2, 1), "Novo mandato"),
-        ("boreal@clients.com", MovementType.deposit, Decimal("95000"), date(2024, 6, 8), "Refor?o de carteira"),
+        ("boreal@clients.com", MovementType.deposit, Decimal("95000"), date(2024, 6, 8), "Reforço de carteira"),
         ("constelacao@clients.com", MovementType.withdrawal, Decimal("45000"), date(2024, 3, 29), "Rebalanceamento"),
     ]
     for client_email, mov_type, amount, mov_date, note in movements:

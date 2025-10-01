@@ -13,5 +13,6 @@ async def test_create_and_filter_clients(client):
 
     list_response = await client.get("/api/clients/", params={"search": "char"})
     assert list_response.status_code == 200
-    clients = list_response.json()
-    assert any(c["email"] == payload["email"] for c in clients)
+    data = list_response.json()
+    assert data["meta"]["total"] >= 1
+    assert any(c["email"] == payload["email"] for c in data["items"])

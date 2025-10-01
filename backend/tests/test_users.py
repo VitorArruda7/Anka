@@ -15,5 +15,6 @@ async def test_create_and_list_users(client):
 
     list_response = await client.get("/api/users/")
     assert list_response.status_code == 200
-    users = list_response.json()
-    assert any(user["email"] == payload["email"] for user in users)
+    data = list_response.json()
+    assert data["meta"]["total"] >= 1
+    assert any(user["email"] == payload["email"] for user in data["items"])

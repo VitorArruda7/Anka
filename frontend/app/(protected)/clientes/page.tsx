@@ -8,13 +8,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 
 import { api } from "@/lib/axios";
-import { Client } from "@/lib/types";
+import { Client, PaginatedResponse, PaginationMeta } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { PaginationControls } from "@/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const clientFormSchema = z.object({
@@ -26,15 +27,18 @@ const clientFormSchema = z.object({
 type ClientFormValues = z.infer<typeof clientFormSchema>;
 type StatusFilter = "todos" | "ativos" | "inativos";
 
-async function fetchClients(search: string, status: StatusFilter) {
-  const params: Record<string, string | number | boolean> = { limit: 100 };
+async function fetchClients(search: string, status: StatusFilter, page: number, pageSize: number) {
+  const params: Record<string, string | number | boolean> = {
+    page,
+    page_size: pageSize,
+  };
   if (search) {
     params.search = search;
   }
   if (status !== "todos") {
     params.is_active = status === "ativos";
   }
-  const response = await api.get<Client[]>("/clients", { params });
+  const response = await api.get<PaginatedResponse<Client>>("/clients", { params });
   return response.data;
 }
 
@@ -58,10 +62,28 @@ export default function ClientesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
-  const { data: clients = [], isLoading } = useQuery({
-    queryKey: ["clientes", search, statusFilter],
-    queryFn: () => fetchClients(search, statusFilter),
+  const pageSize = 20;
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
+  const clientsQuery = useQuery({
+    queryKey: ["clientes", search, statusFilter, page, pageSize],
+    queryFn: () => fetchClients(search, statusFilter, page, pageSize),
   });
+
+  const activeCountQuery = useQuery({
+    queryKey: ["clientes", "ativos-total", search],
+    queryFn: () => fetchClients(search, "ativos", 1, 1),
+    enabled: statusFilter === "todos",
+  });
+
+  const clients = clientsQuery.data?.items ?? [];
+  const meta: PaginationMeta = clientsQuery.data?.meta ?? { total: 0, page, page_size: pageSize, pages: 0 };
+  const isLoading = clientsQuery.isLoading;
+  const isFetching = clientsQuery.isFetching;
 
   const {
     control,
@@ -124,7 +146,24 @@ export default function ClientesPage() {
     }
   };
 
-  const totalAtivos = useMemo(() => clients.filter((client) => client.is_active).length, [clients]);
+  const totalAtivos = useMemo(() => {
+    if (statusFilter === "inativos") {
+      return 0;
+    }
+    if (statusFilter === "ativos") {
+      return meta.total;
+    }
+    return activeCountQuery.data?.meta.total ?? 0;
+  }, [statusFilter, meta.total, activeCountQuery.data?.meta.total]);
+
+  const handlePageChange = (nextPage: number) => {
+    if (meta.pages === 0) {
+      setPage(1);
+      return;
+    }
+    const normalized = Math.min(Math.max(nextPage, 1), meta.pages);
+    setPage(normalized);
+  };
 
   return (
     <div className="space-y-6">
@@ -162,10 +201,10 @@ export default function ClientesPage() {
                     value={field.value ? "true" : "false"}
                     onChange={(event) => field.onChange(event.target.value === "true")}
                   >
-                    <option value="true" className="text-black">
+                    <option value="true">
                       Ativo
                     </option>
-                    <option value="false" className="text-black">
+                    <option value="false">
                       Inativo
                     </option>
                   </select>
@@ -218,13 +257,13 @@ export default function ClientesPage() {
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
               >
-                <option value="todos" className="text-black">
+                <option value="todos">
                   Todos
                 </option>
-                <option value="ativos" className="text-black">
+                <option value="ativos">
                   Apenas ativos
                 </option>
-                <option value="inativos" className="text-black">
+                <option value="inativos">
                   Apenas inativos
                 </option>
               </select>
@@ -289,6 +328,9 @@ export default function ClientesPage() {
               )}
             </TableBody>
           </Table>
+          <div className="pt-2">
+            <PaginationControls meta={meta} onPageChange={handlePageChange} isLoading={isFetching} />
+          </div>
         </CardContent>
       </Card>
     </div>

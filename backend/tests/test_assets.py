@@ -16,5 +16,7 @@ async def test_create_asset(client):
 
     list_response = await client.get("/api/assets/")
     assert list_response.status_code == 200
-    assets = list_response.json()
-    assert any(asset["ticker"] == payload["ticker"] for asset in assets)
+    data = list_response.json()
+    assert data["meta"]["total"] >= 1
+    tickers = [asset["ticker"] for asset in data["items"]]
+    assert payload["ticker"] in tickers

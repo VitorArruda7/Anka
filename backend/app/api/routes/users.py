@@ -1,25 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_active_user
 from app.core.security import get_password_hash
 from app.db.session import get_db
 from app.models.user import User
+from app.utils.pagination import paginate
 from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.schemas.pagination import Paginated
 
 router = APIRouter()
 
 
-@router.get("/", response_model=list[UserRead])
+@router.get("/", response_model=Paginated[UserRead])
 async def list_users(
-    skip: int = 0,
-    limit: int = 50,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=200),
+    search: str | None = None,
     session: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_active_user),
-) -> list[User]:
-    result = await session.execute(select(User).offset(skip).limit(limit))
-    return list(result.scalars().all())
+) -> Paginated[UserRead]:
+    stmt = select(User)
+    if search:
+        pattern = f"%{search}%"
+        stmt = stmt.where(or_(User.name.ilike(pattern), User.email.ilike(pattern)))
+    stmt = stmt.order_by(User.created_at.desc())
+    return await paginate(session, stmt, page=page, page_size=page_size)
 
 
 @router.get("/{user_id}", response_model=UserRead)

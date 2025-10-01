@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,13 +8,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 
 import { api } from "@/lib/axios";
-import { Allocation, Asset, Client } from "@/lib/types";
+import { Allocation, Asset, Client, PaginatedResponse, PaginationMeta } from "@/lib/types";
 import { formatCurrencyBRL, formatDate } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginationControls } from "@/components/ui/pagination";
 
 const allocationSchema = z.object({
   client_id: z.coerce.number({ invalid_type_error: "Selecione um cliente" }),
@@ -30,19 +31,27 @@ const allocationSchema = z.object({
 
 type AllocationFormValues = z.infer<typeof allocationSchema>;
 
+const EMPTY_ALLOCATIONS: Allocation[] = [];
+
 async function fetchClients() {
-  const response = await api.get<Client[]>("/clients", { params: { limit: 200 } });
-  return response.data;
+  const response = await api.get<PaginatedResponse<Client>>("/clients", { params: { page: 1, page_size: 200 } });
+  return response.data.items;
 }
 
 async function fetchAssets() {
-  const response = await api.get<Asset[]>("/assets", { params: { limit: 200 } });
-  return response.data;
+  const response = await api.get<PaginatedResponse<Asset>>("/assets", { params: { page: 1, page_size: 200 } });
+  return response.data.items;
 }
 
-async function fetchAllocations(clientId: number | null) {
-  const params = clientId ? { client_id: clientId } : undefined;
-  const response = await api.get<Allocation[]>("/allocations", { params });
+async function fetchAllocations(clientId: number | null, page: number, pageSize: number) {
+  const params: Record<string, number> = {
+    page,
+    page_size: pageSize,
+  };
+  if (clientId) {
+    params.client_id = clientId;
+  }
+  const response = await api.get<PaginatedResponse<Allocation>>("/allocations", { params });
   return response.data;
 }
 
@@ -62,10 +71,29 @@ export default function AlocacoesPage() {
   const clientsQuery = useQuery({ queryKey: ["clientes", "select"], queryFn: fetchClients });
   const assetsQuery = useQuery({ queryKey: ["ativos", "select"], queryFn: fetchAssets });
 
-  const { data: allocations = [], isLoading } = useQuery({
-    queryKey: ["alocacoes", clientFilter],
-    queryFn: () => fetchAllocations(clientFilter === "todos" ? null : clientFilter),
+  const pageSize = 20;
+  const [page, setPage] = useState(1);
+
+  const selectedClientId = clientFilter === "todos" ? null : Number(clientFilter);
+
+  const allocationsQuery = useQuery({
+    queryKey: ["alocacoes", selectedClientId, page, pageSize],
+    queryFn: () => fetchAllocations(selectedClientId, page, pageSize),
   });
+
+  const allocations = allocationsQuery.data?.items ?? EMPTY_ALLOCATIONS;
+  const meta: PaginationMeta = allocationsQuery.data?.meta ?? { total: 0, page, page_size: pageSize, pages: 0 };
+  const isLoading = allocationsQuery.isLoading;
+  const isFetching = allocationsQuery.isFetching;
+
+  const handlePageChange = (nextPage: number) => {
+    if (meta.pages === 0) {
+      setPage(1);
+      return;
+    }
+    const normalized = Math.min(Math.max(nextPage, 1), meta.pages);
+    setPage(normalized);
+  };
 
   const form = useForm<AllocationFormValues>({
     resolver: zodResolver(allocationSchema),
@@ -148,11 +176,11 @@ export default function AlocacoesPage() {
                 className="mt-2 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground"
                 {...form.register("client_id")}
               >
-                <option value={0} className="text-black">
+                <option value={0}>
                   Selecione
                 </option>
                 {clients.map((client) => (
-                  <option key={client.id} value={client.id} className="text-black">
+                  <option key={client.id} value={client.id}>
                     {client.name}
                   </option>
                 ))}
@@ -168,11 +196,11 @@ export default function AlocacoesPage() {
                 className="mt-2 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground"
                 {...form.register("asset_id")}
               >
-                <option value={0} className="text-black">
+                <option value={0}>
                   Selecione
                 </option>
                 {assets.map((asset) => (
-                  <option key={asset.id} value={asset.id} className="text-black">
+                  <option key={asset.id} value={asset.id}>
                     {asset.ticker} • {asset.name}
                   </option>
                 ))}
@@ -230,11 +258,11 @@ export default function AlocacoesPage() {
                 setClientFilter(value === "todos" ? "todos" : Number(value));
               }}
             >
-              <option value="todos" className="text-black">
+              <option value="todos">
                 Todos os clientes
               </option>
               {clients.map((client) => (
-                <option key={client.id} value={client.id} className="text-black">
+                <option key={client.id} value={client.id}>
                   {client.name}
                 </option>
               ))}
@@ -302,6 +330,9 @@ export default function AlocacoesPage() {
               )}
             </TableBody>
           </Table>
+          <div className="pt-2">
+            <PaginationControls meta={meta} onPageChange={handlePageChange} isLoading={isFetching} />
+          </div>
         </CardContent>
       </Card>
     </div>
