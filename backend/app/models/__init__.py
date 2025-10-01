@@ -1,4 +1,5 @@
 from app.models.user import User
+from app.models.audit_log import AuditLog
 from app.models.client import Client
 from app.models.asset import Asset
 from app.models.allocation import Allocation
@@ -11,4 +12,5 @@ __all__ = [
     "Allocation",
     "Movement",
     "MovementType",
+    "AuditLog",
 ]

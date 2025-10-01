@@ -6,6 +6,7 @@ from app.api.deps import get_current_active_user
 from app.core.security import get_password_hash
 from app.db.session import get_db
 from app.models.user import User
+from app.services.audit import log_audit_event
 from app.utils.pagination import paginate
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.pagination import Paginated
@@ -45,7 +46,7 @@ async def get_user(
 async def create_user(
     user_in: UserCreate,
     session: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> User:
     result = await session.execute(select(User).where(User.email == user_in.email))
     if result.scalars().first():
@@ -57,6 +58,15 @@ async def create_user(
         is_active=user_in.is_active,
     )
     session.add(user)
+    await session.flush()
+    await log_audit_event(
+        session,
+        user_id=current_user.id,
+        action="user.created",
+        entity="user",
+        entity_id=user.id,
+        metadata={"email": user.email, "name": user.name},
+    )
     await session.commit()
     await session.refresh(user)
     return user
@@ -67,16 +77,29 @@ async def update_user(
     user_id: int,
     user_in: UserUpdate,
     session: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> User:
     user = await session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     update_data = user_in.model_dump(exclude_unset=True)
+    changed_fields: list[str] = []
     if "password" in update_data:
         user.hashed_password = get_password_hash(update_data.pop("password"))
+        changed_fields.append("password")
     for field, value in update_data.items():
         setattr(user, field, value)
+    if update_data:
+        changed_fields.extend(update_data.keys())
+    if changed_fields:
+        await log_audit_event(
+            session,
+            user_id=current_user.id,
+            action="user.updated",
+            entity="user",
+            entity_id=user.id,
+            metadata={"fields": sorted(set(changed_fields))},
+        )
     await session.commit()
     await session.refresh(user)
     return user
@@ -86,11 +109,19 @@ async def update_user(
 async def delete_user(
     user_id: int,
     session: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> None:
     user = await session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    await log_audit_event(
+        session,
+        user_id=current_user.id,
+        action="user.deleted",
+        entity="user",
+        entity_id=user.id,
+        metadata={"email": user.email},
+    )
     await session.delete(user)
     await session.commit()
     return None

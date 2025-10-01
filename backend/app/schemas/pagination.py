@@ -4,7 +4,6 @@ from math import ceil
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
-from pydantic.generics import GenericModel
 
 T = TypeVar("T")
 
@@ -22,6 +21,6 @@ class PaginationMeta(BaseModel):
         return cls(total=total, page=current_page, page_size=page_size, pages=pages)
 
 
-class Paginated(GenericModel, Generic[T]):
+class Paginated(BaseModel, Generic[T]):
     items: list[T]
     meta: PaginationMeta

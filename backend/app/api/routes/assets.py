@@ -9,6 +9,7 @@ from app.models.user import User
 from app.utils.pagination import paginate
 from app.schemas.asset import AssetCreate, AssetRead
 from app.schemas.pagination import Paginated
+from app.services.audit import log_audit_event
 from app.services.dashboard_metrics import invalidate_dashboard_metrics
 from app.services.yahoo_finance import yahoo_finance_service
 
@@ -41,12 +42,21 @@ async def list_assets(
 async def create_asset(
     asset_in: AssetCreate,
     session: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> Asset:
     payload = asset_in.model_dump()
     payload["ticker"] = payload["ticker"].upper()
     asset = Asset(**payload)
     session.add(asset)
+    await session.flush()
+    await log_audit_event(
+        session,
+        user_id=current_user.id,
+        action="asset.created",
+        entity="asset",
+        entity_id=asset.id,
+        metadata={"ticker": asset.ticker, "name": asset.name},
+    )
     await session.commit()
     await session.refresh(asset)
     await invalidate_dashboard_metrics()
@@ -57,7 +67,7 @@ async def create_asset(
 async def fetch_asset(
     ticker: str,
     session: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> Asset:
     normalized = ticker.upper()
     result = await session.execute(select(Asset).where(Asset.ticker == normalized))
@@ -75,6 +85,18 @@ async def fetch_asset(
         currency=payload.get("currency", "USD"),
     )
     session.add(asset)
+    await session.flush()
+    await log_audit_event(
+        session,
+        user_id=current_user.id,
+        action="asset.imported",
+        entity="asset",
+        entity_id=asset.id,
+        metadata={
+            "ticker": asset.ticker,
+            "source": "yahoo",
+        },
+    )
     await session.commit()
     await session.refresh(asset)
     await invalidate_dashboard_metrics()

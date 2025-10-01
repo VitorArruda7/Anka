@@ -6,6 +6,7 @@ from app.api.deps import get_current_active_user
 from app.db.session import get_db
 from app.models.allocation import Allocation
 from app.models.user import User
+from app.services.audit import log_audit_event
 from app.services.dashboard_metrics import invalidate_dashboard_metrics
 from app.utils.pagination import paginate
 from app.schemas.allocation import AllocationCreate, AllocationRead
@@ -36,10 +37,22 @@ async def list_allocations(
 async def create_allocation(
     allocation_in: AllocationCreate,
     session: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> Allocation:
     allocation = Allocation(**allocation_in.model_dump())
     session.add(allocation)
+    await session.flush()
+    await log_audit_event(
+        session,
+        user_id=current_user.id,
+        action="allocation.created",
+        entity="allocation",
+        entity_id=allocation.id,
+        metadata={
+            "client_id": allocation.client_id,
+            "asset_id": allocation.asset_id,
+        },
+    )
     await session.commit()
     await session.refresh(allocation)
     await invalidate_dashboard_metrics()
@@ -50,11 +63,22 @@ async def create_allocation(
 async def delete_allocation(
     allocation_id: int,
     session: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> None:
     allocation = await session.get(Allocation, allocation_id)
     if not allocation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Allocation not found")
+    await log_audit_event(
+        session,
+        user_id=current_user.id,
+        action="allocation.deleted",
+        entity="allocation",
+        entity_id=allocation.id,
+        metadata={
+            "client_id": allocation.client_id,
+            "asset_id": allocation.asset_id,
+        },
+    )
     await session.delete(allocation)
     await session.commit()
     await invalidate_dashboard_metrics()

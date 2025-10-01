@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.models.client import Client
 from app.models.user import User
 from app.services.dashboard_metrics import invalidate_dashboard_metrics
+from app.services.audit import log_audit_event
 from app.utils.pagination import paginate
 from app.schemas.client import ClientCreate, ClientRead, ClientUpdate
 from app.schemas.pagination import Paginated
@@ -49,10 +50,19 @@ async def get_client(
 async def create_client(
     client_in: ClientCreate,
     session: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> Client:
     client = Client(**client_in.model_dump())
     session.add(client)
+    await session.flush()
+    await log_audit_event(
+        session,
+        user_id=current_user.id,
+        action="client.created",
+        entity="client",
+        entity_id=client.id,
+        metadata={"email": client.email, "name": client.name},
+    )
     await session.commit()
     await session.refresh(client)
     await invalidate_dashboard_metrics()
@@ -64,7 +74,7 @@ async def update_client(
     client_id: int,
     client_in: ClientUpdate,
     session: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> Client:
     client = await session.get(Client, client_id)
     if not client:
@@ -72,6 +82,15 @@ async def update_client(
     update_data = client_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(client, field, value)
+    if update_data:
+        await log_audit_event(
+            session,
+            user_id=current_user.id,
+            action="client.updated",
+            entity="client",
+            entity_id=client.id,
+            metadata={"fields": sorted(update_data.keys())},
+        )
     await session.commit()
     await session.refresh(client)
     await invalidate_dashboard_metrics()
@@ -82,11 +101,19 @@ async def update_client(
 async def delete_client(
     client_id: int,
     session: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> None:
     client = await session.get(Client, client_id)
     if not client:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+    await log_audit_event(
+        session,
+        user_id=current_user.id,
+        action="client.deleted",
+        entity="client",
+        entity_id=client.id,
+        metadata={"email": client.email, "name": client.name},
+    )
     await session.delete(client)
     await session.commit()
     await invalidate_dashboard_metrics()

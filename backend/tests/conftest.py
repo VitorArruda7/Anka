@@ -15,7 +15,7 @@ from app.api.deps import get_current_active_user
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
-from app.models import Allocation, Asset, Client, Movement, User
+from app.models import Allocation, Asset, AuditLog, Client, Movement, User
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -38,7 +38,7 @@ async def db_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
     async_session = async_sessionmaker(async_engine, expire_on_commit=False)
     async with async_session() as session:
         yield session
-        for model in (Allocation, Movement, Asset, Client, User):
+        for model in (AuditLog, Allocation, Movement, Asset, Client, User):
             await session.execute(delete(model))
         await session.commit()
 
@@ -48,8 +48,9 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     async def _get_test_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
-    async def _get_test_user() -> User:
-        return User(
+    test_user = await db_session.get(User, 1)
+    if not test_user:
+        test_user = User(
             id=1,
             name="Test User",
             email="test@example.com",
@@ -57,6 +58,12 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
             is_active=True,
             created_at=datetime.now(UTC),
         )
+        db_session.add(test_user)
+        await db_session.commit()
+        await db_session.refresh(test_user)
+
+    async def _get_test_user() -> User:
+        return test_user
 
     app.dependency_overrides[get_db] = _get_test_db
     app.dependency_overrides[get_current_active_user] = _get_test_user

@@ -8,6 +8,7 @@ from app.api.deps import get_current_active_user
 from app.db.session import get_db
 from app.models.movement import Movement, MovementType
 from app.models.user import User
+from app.services.audit import log_audit_event
 from app.services.dashboard_metrics import invalidate_dashboard_metrics
 from app.utils.pagination import paginate
 from app.schemas.movement import MovementCreate, MovementRead
@@ -47,10 +48,22 @@ async def list_movements(
 async def create_movement(
     movement_in: MovementCreate,
     session: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> Movement:
     movement = Movement(**movement_in.model_dump())
     session.add(movement)
+    await session.flush()
+    await log_audit_event(
+        session,
+        user_id=current_user.id,
+        action="movement.created",
+        entity="movement",
+        entity_id=movement.id,
+        metadata={
+            "client_id": movement.client_id,
+            "type": movement.type.value,
+        },
+    )
     await session.commit()
     await session.refresh(movement)
     await invalidate_dashboard_metrics()
@@ -61,11 +74,22 @@ async def create_movement(
 async def delete_movement(
     movement_id: int,
     session: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> None:
     movement = await session.get(Movement, movement_id)
     if movement is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movement not found")
+    await log_audit_event(
+        session,
+        user_id=current_user.id,
+        action="movement.deleted",
+        entity="movement",
+        entity_id=movement.id,
+        metadata={
+            "client_id": movement.client_id,
+            "type": movement.type.value,
+        },
+    )
     await session.delete(movement)
     await session.commit()
     await invalidate_dashboard_metrics()

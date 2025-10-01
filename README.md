@@ -1,74 +1,100 @@
-﻿# Anka Fullstack Investment Dashboard
+# Anka Fullstack Investment Dashboard
 
-Plataforma full-stack para gerenciar clientes, alocações de ativos e fluxos de caixa de um escritório de investimentos. O stack combina FastAPI, PostgreSQL e Redis no backend com um dashboard Next.js 14 no frontend. Tudo está containerizado via Docker Compose.
+Aplicacao full-stack para um escritorio de investimentos gerenciar clientes, ativos, alocacoes e fluxos de caixa. Backend em FastAPI + PostgreSQL + Redis, frontend em Next.js 14. Todo o ambiente sobe via Docker Compose.
 
-## Estrutura
+## Estrutura do projeto
 
-- `backend/` - servico FastAPI com autenticacao JWT, modelos SQLAlchemy, migracoes Alembic, testes assincronos e exportacao CSV e Excel (dashboard).
-- `frontend/` - projeto Next.js 14 (App Router) com TanStack Query, UI inspirada no ShadCN, graficos e downloads CSV/Excel.
-- `docker-compose.yml` – orquestra PostgreSQL, Redis, API e interface.
+- `backend/` - API FastAPI com autenticacao JWT, ORM SQLAlchemy 2, Redis para cache, auditoria, exportacao CSV/Excel e testes automatizados `pytest`.
+- `frontend/` - Next.js 14 (App Router) com TypeScript, TanStack Query, componentes baseados em ShadCN, graficos e exportacao de dados.
+- `docker-compose.yml` - orquestra Postgres 15, Redis 7, backend e frontend.
 
-## Execução com Docker
+## Executando com Docker
 
-Pré-requisito: Docker Desktop (ou docker + plugin docker compose).
+Prerequisito: Docker Desktop (ou Docker Engine + plugin compose).
 
 ```bash
 docker compose up --build
 ```
 
-Serviços disponíveis:
+Servicos apos o build:
 
-- API Backend: http://localhost:8000/api
-- API Docs (Swagger): http://localhost:8000/docs
-- Aplicação Frontend: http://localhost:3000
+- Backend: http://localhost:8000/api
+- Docs Swagger: http://localhost:8000/docs
+- Frontend: http://localhost:3000
 
-## Desenvolvimento local
+## Desenvolvimento local (sem Docker)
 
-Backend e frontend podem rodar separados fora do Docker. Cada pasta tem instruções detalhadas (`backend/README.md`, `frontend/README.md`). Passo a passo geral:
+Cada pasta possui README proprio com mais detalhes. Resumo:
 
-1. Criar e ativar uma virtualenv Python.
-2. `pip install -r backend/requirements-dev.txt`
-3. Copiar `backend/.env.example` para `backend/.env` e ajustar segredos/URLs.
-4. Rodar migrações: `alembic upgrade head` (PostgreSQL precisa estar disponível).
-5. Iniciar a API: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
-6. No frontend, `npm install`.
-7. Copiar `frontend/.env.example` para `.env.local` e definir `NEXT_PUBLIC_API_URL`.
-8. Rodar `npm run dev`.
+1. Criar virtualenv Python e instalar deps: `pip install -r backend/requirements-dev.txt`.
+2. Copiar `backend/.env.example` para `backend/.env` e ajustar segredos (`DATABASE_URL`, `SECRET_KEY`, etc.).
+3. Rodar migracoes: `alembic upgrade head` (Postgres precisa estar ativo).
+4. Iniciar API: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`.
+5. No frontend: `npm install` e `cp frontend/.env.example frontend/.env.local` definindo `NEXT_PUBLIC_API_URL`.
+6. Rodar `npm run dev`.
 
-## Populando o sistema
+## Seed de dados
 
-### Seed automático
-
-Uma base demo (usuário, clientes, ativos, alocações e movimentações) pode ser carregada quando quiser.
+Existe um seed opcional com usuario demo, clientes, ativos, alocacoes e movimentacoes.
 
 ```bash
 # Ambiente local
 cd backend
 python -m app.seed.sample_data
 
-# Via Docker
+# Usando Docker
 docker compose exec backend python -m app.seed.sample_data
 ```
 
 Credenciais geradas: `demo@anka.com` / `demo123`.
 
-### Fluxo manual
+Caso precise resetar completamente o banco em Docker:
 
-1. **Importar ativos:** na página *Ativos* busque tickers como `PETR4.SA` ou `AAPL`. A API consulta primeiro o Yahoo Finance e, se necessário, recorre à BRAPI.
-2. **Cadastrar clientes:** na tela *Clientes*, informe nome, e-mail e status.
-3. **Alocações:** vincule clientes e ativos na tela *Alocações* (quantidade, preço, data).
-4. **Movimentações:** registre entradas/saídas em *Movimentações* para alimentar indicadores de fluxo.
-5. **Exportacoes:** gere CSVs (clientes, alocacoes, movimentacoes) e Excel completo do dashboard na tela *Exportacoes* ou via `/api/export/*` e `/api/export/dashboard/excel`.
+```bash
+docker compose down
+docker volume rm ankafullstack_db_data
+docker compose up -d
+# aplicar migracoes antes do seed
+docker compose exec backend alembic upgrade head
+```
 
-## Integração de dados de mercado
+## Funcionalidades chave
 
-- Fonte primária: Yahoo Finance (requisições autenticadas via crumb e cookie).
-- Fallback: endpoint público da BRAPI para contornar limites regionais.
-- Token opcional: configure `BRAPI_TOKEN` no `backend/.env` se possuir chave (maior quota para ativos brasileiros).
+- Autenticacao JWT com login, registro e CRUD de usuarios (administradores).
+- Cadastro e listagem de clientes com paginacao, busca e filtro por status.
+- Importacao de ativos via Yahoo Finance (fallback BRAPI) + cadastro manual.
+- Gestao de alocacoes (cliente x ativo) com paginacao e exportacao.
+- Registro de movimentacoes (deposito/retirada) com filtros de periodo e indicadores.
+- Dashboard consolidado com cache Redis, exportacao Excel/CSV.
+- Auditoria completa: toda acao CRUD relevante grava evento em `audit_logs` com metadados e user.
 
-O serviço sempre normaliza ticker, nome, bolsa e moeda antes de salvar novos ativos.
+## Integracoes externas
+
+- Yahoo Finance para quotes (crumb + cookie automaticos).
+- BRAPI como fallback opcional. Configure `BRAPI_TOKEN` em `backend/.env` para ampliar limites.
 
 ## Testes
 
 - Backend: `pytest`
 - Frontend: `npm run lint`
+
+Os testes backend rodam 100% assincronos usando banco SQLite em memoria. Antes de entregar, execute:
+
+```bash
+# backend
+dotenv -f backend/.env pytest  # ou simplesmente python -m pytest dentro da venv
+
+# frontend
+npm run lint
+```
+
+## Auditoria e cache
+
+- `audit_logs` registra acao, entidade, IDs, usuario e payload complementar.
+- Redis guarda snapshots do dashboard e quotes de mercado, com invalidacao automatica apos mutacoes.
+
+## Deploy
+
+- Ajustar variaveis em `backend/.env` para ambiente (secret, DB, Redis, tokens).
+- Rodar migracoes `alembic upgrade head` apos subir containers.
+- Opcional: executar seed para dados demo.

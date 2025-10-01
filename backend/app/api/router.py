@@ -9,6 +9,7 @@ from app.api.routes import (
     export,
     movements,
     users,
+    audit,
 )
 
 api_router = APIRouter()
@@ -20,3 +21,4 @@ api_router.include_router(allocations.router, prefix="/allocations", tags=["allo
 api_router.include_router(movements.router, prefix="/movements", tags=["movements"])
 api_router.include_router(export.router, prefix="/export", tags=["export"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
